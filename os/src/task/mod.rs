@@ -14,7 +14,9 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::timer::get_time_ms;
 use crate::loader::{get_app_data, get_num_app};
+use crate::syscall::TaskInfo;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -78,6 +80,7 @@ impl TaskManager {
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
+        next_task.start_time = get_time_ms();
         next_task.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
@@ -140,6 +143,9 @@ impl TaskManager {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
+            if inner.tasks[next].start_time == 0{
+                inner.tasks[next].start_time = get_time_ms();
+            }
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
@@ -152,6 +158,27 @@ impl TaskManager {
         } else {
             panic!("All applications completed!");
         }
+    }
+    /// increase syscall_times
+    fn syscall_count(&self,syscall_id:usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].syscall_times[syscall_id] += 1;
+        drop(inner);
+    }
+    /// get task_info
+    fn get_task_info(&self, task_info: *mut TaskInfo) {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let time = get_time_ms();
+        unsafe {
+            (*task_info).time = time - inner.tasks[current].start_time;
+            (*task_info)
+                .syscall_times
+                .copy_from_slice(& inner.tasks[current].syscall_times);
+            (*task_info).status = TaskStatus::Running;
+        }
+        drop(inner);
     }
 }
 
@@ -201,4 +228,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// count syscall 
+pub fn syscall_count(syscall_id:usize){
+    TASK_MANAGER.syscall_count(syscall_id);
+}
+
+/// get task_info
+pub fn get_task_info(task_info: *mut TaskInfo) {
+    TASK_MANAGER.get_task_info(task_info);
 }

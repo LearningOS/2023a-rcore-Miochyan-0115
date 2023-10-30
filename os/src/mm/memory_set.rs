@@ -37,6 +37,7 @@ lazy_static! {
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
+    virt_phys_map:BTreeMap<VirtPageNum,FrameTracker>,
 }
 
 impl MemorySet {
@@ -45,6 +46,7 @@ impl MemorySet {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
+            virt_phys_map:BTreeMap::new(),
         }
     }
     /// Get the page table token
@@ -261,6 +263,14 @@ impl MemorySet {
         } else {
             false
         }
+    }
+
+    pub fn mmap(){
+        
+    }
+
+    pub fn unmmap(){
+
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory
