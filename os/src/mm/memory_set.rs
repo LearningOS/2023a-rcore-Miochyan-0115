@@ -265,12 +265,52 @@ impl MemorySet {
         }
     }
 
-    pub fn mmap(){
-        
+    /// mmap
+    pub fn mmap(&mut self,_start: usize, _len: usize, _port: usize)->isize{
+        let start:VirtAddr = _start.into();
+        let end:VirtAddr = (_start + _len).into();
+        let mut vpn:VirtPageNum = start.into();
+        let vpn_e:VirtPageNum = end.ceil();
+        let flags = PTEFlags::from_bits(_port as u8).unwrap();
+        while vpn != vpn_e {
+            if let Some(pte) = self.page_table.translate(vpn) {
+                // this page is exist
+                if pte.is_valid() {
+                    return -1;
+                }
+            }
+            if let Some(frame) = frame_alloc() {
+                let ppn = frame.ppn;
+                self.page_table.map(vpn, ppn, flags);
+                self.virt_phys_map.insert(vpn, frame);
+            } else {
+                //  out of memory 
+                return -1;
+            }
+            //  Continue to allocate the next block 
+            vpn.step();
+        }
+        0    
     }
-
-    pub fn unmmap(){
-
+    /// munmap
+    pub fn munmap(&mut self,_start: usize, _len: usize) -> isize{
+        let start:VirtAddr = _start.into();
+        let end:VirtAddr = (_start + _len).into();
+        let mut vpn:VirtPageNum = start.into();
+        let vpn_e:VirtPageNum = end.ceil();
+        while vpn != vpn_e{
+            if let Some(pte) = self.page_table.translate(vpn) {
+                // this page is exist
+                if pte.is_valid() {
+                    self.page_table.unmap(vpn);
+                    self.virt_phys_map.remove(&vpn);
+                }else {
+                    return -1;
+                }
+            }  
+            vpn.step();
+        }   
+        0
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory
@@ -420,3 +460,4 @@ pub fn remap_test() {
         .executable(),);
     println!("remap_test passed!");
 }
+

@@ -3,7 +3,7 @@ use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
-        get_task_info,current_user_token,
+        get_task_info,current_user_token,mmap,munmap
     },
     timer::get_time_us,
     mm::get_physaddr,
@@ -72,19 +72,16 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     if _port & !0x7 != 0 || _port & 0x7 == 0|| _start & (1<<12)-1 !=0 {
         return -1;
     }
-    let result = mmap(_start, _len, _port);
-    if result ==0 {
-        0
-    }
-    else {
-        -1
-    }
+    mmap(_start, _len, _port)
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    if _start & (1<<12)-1 !=0{
+        return  -1;
+    }
+    munmap(_start, _len)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

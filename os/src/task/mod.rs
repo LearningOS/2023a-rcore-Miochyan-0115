@@ -14,7 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::timer::get_time_ms;
+use crate::timer::get_time_us;
 use crate::loader::{get_app_data, get_num_app};
 use crate::syscall::TaskInfo;
 use crate::sync::UPSafeCell;
@@ -80,7 +80,7 @@ impl TaskManager {
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
-        next_task.start_time = get_time_ms();
+        next_task.start_time = get_time_us()/1000;
         next_task.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
@@ -144,7 +144,7 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             if inner.tasks[next].start_time == 0{
-                inner.tasks[next].start_time = get_time_ms();
+                inner.tasks[next].start_time = get_time_us()/1000;
             }
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
@@ -170,15 +170,25 @@ impl TaskManager {
     fn get_task_info(&self, task_info: *mut TaskInfo) {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        let time = get_time_ms();
+        let time = get_time_us()/1000;
         unsafe {
             (*task_info).time = time - inner.tasks[current].start_time;
-            (*task_info)
-                .syscall_times
-                .copy_from_slice(& inner.tasks[current].syscall_times);
+            (*task_info).syscall_times.copy_from_slice(& inner.tasks[current].syscall_times);
             (*task_info).status = TaskStatus::Running;
         }
         drop(inner);
+    }
+    /// 
+    fn mmap (&self, _start: usize, _len: usize, _port: usize)->isize{
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].memory_set.mmap(_start, _len, _port)
+    }
+    /// 
+    fn munmap (&self, _start: usize, _len: usize)->isize{
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].memory_set.munmap(_start, _len)
     }
 }
 
@@ -238,4 +248,14 @@ pub fn syscall_count(syscall_id:usize){
 /// get task_info
 pub fn get_task_info(task_info: *mut TaskInfo) {
     TASK_MANAGER.get_task_info(task_info);
+}
+
+///  Allocate Memory 
+pub fn mmap(_start: usize, _len: usize, _port: usize) -> isize {
+    TASK_MANAGER.mmap(_start, _len,_port)
+}
+
+///  Reclaim memory 
+pub fn munmap(_start: usize, _len: usize) -> isize {
+    TASK_MANAGER.munmap(_start, _len)
 }
