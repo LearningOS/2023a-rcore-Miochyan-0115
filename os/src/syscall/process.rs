@@ -69,6 +69,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+    trace!("kernel: sys_mmap ");
     if _port & !0x7 != 0 || _port & 0x7 == 0|| _start & (1<<12)-1 !=0 {
         return -1;
     }
@@ -77,7 +78,7 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_munmap");
     if _start & (1<<12)-1 !=0{
         return  -1;
     }

@@ -271,7 +271,18 @@ impl MemorySet {
         let end:VirtAddr = (_start + _len).into();
         let mut vpn:VirtPageNum = start.into();
         let vpn_e:VirtPageNum = end.ceil();
-        let flags = PTEFlags::from_bits(_port as u8).unwrap();
+        let mut flags = PTEFlags::empty();
+        flags = flags | PTEFlags::U;
+        flags = flags | PTEFlags::V;
+        if _port % 2 == 1 {
+            flags = flags | PTEFlags::R;
+        }
+        if _port>>1 %2 == 1 {
+            flags = flags | PTEFlags::W;
+        }
+        if _port>>2 %2 == 1 {
+            flags = flags | PTEFlags::X;
+        }
         while vpn != vpn_e {
             if let Some(pte) = self.page_table.translate(vpn) {
                 // this page is exist
@@ -281,6 +292,7 @@ impl MemorySet {
             }
             if let Some(frame) = frame_alloc() {
                 let ppn = frame.ppn;
+                debug!(" map vpn {:?} and ppn {:?} flag {:?}", vpn, ppn, flags);
                 self.page_table.map(vpn, ppn, flags);
                 self.virt_phys_map.insert(vpn, frame);
             } else {
@@ -306,8 +318,10 @@ impl MemorySet {
                     self.virt_phys_map.remove(&vpn);
                 }else {
                     return -1;
-                }
-            }  
+                } 
+            }else {
+                return -1;
+            } 
             vpn.step();
         }   
         0
